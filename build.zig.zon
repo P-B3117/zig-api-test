@@ -40,6 +40,10 @@
             .url = "git+https://github.com/cztomsik/tokamak#42687e78ec1163ae3d3e44d21fd83b311c63da62",
             .hash = "tokamak-2.0.0-FbnSeVcqBACBfoY3CDokudzjENIUeddBb6KETUU-bOuC",
         },
+        .fridge = .{
+            .url = "https://github.com/cztomsik/fridge/archive/refs/heads/main.tar.gz",
+            .hash = "fridge-0.9.5-3GyIip6PAQBk67No4W0T6Do4qtqj1tsU5uJn1FnjJ15g",
+        },
     },
     .paths = .{
         "build.zig",
