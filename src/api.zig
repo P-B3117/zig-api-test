@@ -30,7 +30,8 @@ pub const Api = struct {
         const req = try db.query(res.Components).find(id);
         if (req) |s| {
             // std.debug.print("component found: {}\n", .{s});
-            return s;
+            // Clone the string data to prevent use-after-free
+            return try s.clone(allocator);
         } else {
             return compErr;
         }
@@ -47,7 +48,9 @@ pub const Api = struct {
         defer ret.deinit();
 
         for (try db.query(res.Components).findAll()) |req| {
-            try ret.append(req);
+            // Clone the string data to prevent use-after-free
+            const cloned_component = try req.clone(allocator);
+            try ret.append(cloned_component);
         }
         return ret.toOwnedSlice();
     }
