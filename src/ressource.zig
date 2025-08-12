@@ -71,20 +71,6 @@ pub const Components = struct {
     description: []const u8,
     vendor_part_number: []const u8,
     price: []const u8, // gonna have to figure out how to handle this as a float
-
-    pub fn clone(self: Components, allocator: std.mem.Allocator) !Components {
-        return Components{
-            .id = self.id,
-            .type_id = self.type_id,
-            .value = try allocator.dupe(u8, self.value),
-            .quantity = self.quantity,
-            .footprint = try allocator.dupe(u8, self.footprint),
-            .vendor_id = self.vendor_id,
-            .description = try allocator.dupe(u8, self.description),
-            .vendor_part_number = try allocator.dupe(u8, self.vendor_part_number),
-            .price = try allocator.dupe(u8, self.price),
-        };
-    }
 };
 
 pub const Vendors = struct {

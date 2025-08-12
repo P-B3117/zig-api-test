@@ -1,7 +1,10 @@
 const std = @import("std");
+const tk = @import("tokamak");
 
 const gb = @import("./global.zig");
 const res = @import("./ressource.zig");
+
+const index = @embedFile("./html/index.html");
 
 const compErr = res.Components{
     .id = 0,
@@ -15,15 +18,18 @@ const compErr = res.Components{
     .price = "",
 };
 
+// To be known that specifying the allocator in the function parameters is necessary for memory management as that
+// allocator frees everything after the requests ends. Somehow that doesn't work for the db.
 pub const Api = struct {
-    pub fn @"GET /"() ![]const u8 {
-        return "Hello";
+    pub fn @"GET /"(response: *tk.Response) !void {
+        response.header("Content-Type", "text/html");
+        response.body = index;
+        try response.write();
     }
 
-    pub fn @"GET /components/:id"(id: u32) !res.Components {
+    pub fn @"GET /components/:id"(allocator: std.mem.Allocator, id: u32) !res.Components {
         std.debug.print("component: {}\n", .{id});
 
-        const allocator = std.heap.page_allocator;
         var db = try gb.app.dbPool.getSession(allocator);
         defer db.deinit();
 
@@ -31,26 +37,25 @@ pub const Api = struct {
         if (req) |s| {
             // std.debug.print("component found: {}\n", .{s});
             // Clone the string data to prevent use-after-free
-            return try s.clone(allocator);
+            return s;
         } else {
             return compErr;
         }
     }
 
-    pub fn @"GET /components/"() ![]const res.Components {
+    pub fn @"GET /components/"(allocator: std.mem.Allocator) ![]const res.Components {
         //std.debug.print("Listing all components\n", .{});
-        const allocator = std.heap.page_allocator;
         var db = try gb.app.dbPool.getSession(allocator);
         defer db.deinit();
 
         // Create an ArrayList to hold Components values
         var ret = std.ArrayList(res.Components).init(allocator);
-        defer ret.deinit();
+        // defer ret.deinit();
 
         for (try db.query(res.Components).findAll()) |req| {
             // Clone the string data to prevent use-after-free
-            const cloned_component = try req.clone(allocator);
-            try ret.append(cloned_component);
+            // const clone = try req.clone(allocator);
+            try ret.append(req);
         }
         return ret.toOwnedSlice();
     }
