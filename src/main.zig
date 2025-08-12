@@ -13,16 +13,18 @@ const routes: []const tk.Route = &.{
     .send(error.NotFound),
 };
 
+// TODO add env variable support for app port
 pub fn main() !void {
     // generating memory allocator for db
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+    defer _ = gpa.detectLeaks();
     defer _ = gpa.deinit();
 
     // initializing db
     std.debug.print("initializing db\n", .{});
     try gb.app.initDb(allocator);
-    defer gb.app.dbSession.deinit();
+    defer gb.app.dbPool.deinit();
 
     // var inj = tk.Injector.init(&.{.ref(gb.app)}, null);
 

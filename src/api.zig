@@ -1,38 +1,52 @@
 const std = @import("std");
+
 const gb = @import("./global.zig");
 const res = @import("./ressource.zig");
 
+const compErr = res.Components{
+    .id = 0,
+    .type_id = 0,
+    .value = "",
+    .quantity = 0,
+    .footprint = "",
+    .vendor_id = 0,
+    .description = "",
+    .vendor_part_number = "",
+    .price = "",
+};
+
 pub const Api = struct {
     pub fn @"GET /"() ![]const u8 {
-        std.debug.print("Ans Table:\n", .{});
-
-        for (try gb.app.dbSession.query(res.Ans).findAll()) |ans| {
-            std.debug.print("Ans: {}, {s}, {s}\n", .{ ans.id, ans.title, ans.body });
-        }
-
         return "Hello";
     }
 
-    pub fn @"GET /miam/:id"(id: u32) !res.Ans {
-        std.debug.print("miam: {}\n", .{id});
-        const req = try gb.app.dbSession.query(res.Ans).find(id);
+    pub fn @"GET /components/:id"(id: u32) !res.Components {
+        std.debug.print("component: {}\n", .{id});
+
+        const allocator = std.heap.page_allocator;
+        var db = try gb.app.dbPool.getSession(allocator);
+        defer db.deinit();
+
+        const req = try db.query(res.Components).find(id);
         if (req) |s| {
-            return .{ .id = s.id, .title = s.title, .body = s.body };
+            // std.debug.print("component found: {}\n", .{s});
+            return s;
         } else {
-            return .{ .id = 0, .title = "error", .body = "error" };
+            return compErr;
         }
     }
 
-    pub fn @"GET /miam/"() ![]const res.Ans {
-        std.debug.print("miam\n", .{});
+    pub fn @"GET /components/"() ![]const res.Components {
+        //std.debug.print("Listing all components\n", .{});
         const allocator = std.heap.page_allocator;
+        var db = try gb.app.dbPool.getSession(allocator);
+        defer db.deinit();
 
-        // Create an ArrayList to hold Ans values
-        var ret = std.ArrayList(res.Ans).init(allocator);
+        // Create an ArrayList to hold Components values
+        var ret = std.ArrayList(res.Components).init(allocator);
         defer ret.deinit();
 
-        for (try gb.app.dbSession.query(res.Ans).findAll()) |req| {
-            std.debug.print("req: {} {s} {s}\n", .{ req.id, req.title, req.body });
+        for (try db.query(res.Components).findAll()) |req| {
             try ret.append(req);
         }
         return ret.toOwnedSlice();

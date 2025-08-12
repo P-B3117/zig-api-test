@@ -9,29 +9,49 @@ const testSql = @embedFile("./sql/test_values.sql");
 
 pub const App = struct {
     port: u16,
-    dbSession: fr.Session,
+    dbPool: fr.Pool(fr.SQLite3),
     inProduction: bool = false,
+    dbFileCreate: bool = false,
+    dbPath: [:0]const u8 = "inventorusDb.sqlite",
 
     pub fn initDb(self: *App, allocator: std.mem.Allocator) !void {
         try self.getProduction();
-        self.dbSession = try fr.Session.open(fr.SQLite3, allocator, .{ .filename = ":memory:" });
+        try self.getDbPath();
+        self.dbPool = try fr.Pool(fr.SQLite3).init(allocator, .{ .max_count = 5 }, .{ .filename = self.dbPath });
 
-        try self.dbSession.exec(initSql, .{});
-        if (!self.inProduction) {
-            try self.dbSession.exec(testSql, .{});
+        var db = try self.dbPool.getSession(allocator);
+        defer db.deinit();
+
+        try db.conn.execAll(initSql);
+        if (!self.inProduction and self.dbFileCreate) {
+            try db.conn.execAll(testSql);
         }
-
-        const ans = try self.dbSession.insert(Ans, .{ .title = "allo", .body = "ça marche" });
-        _ = try self.dbSession.insert(Ans, .{ .title = "allo2", .body = "ça marche mieux" });
-        std.debug.print("Insert answer: {}\n", .{ans});
     }
 
-    pub fn getProduction(self: *App) !void {
-        const lol = std.posix.getenv("INVENTORUS_TEST"); // catch |err| switch (err) {
-        //     error.EnvironmentVariableNotFound => self.inProduction = true,
-        //     else => return err, // Re-throw other errors
-        // };
-        std.debug.print("{}  {}", .{ lol, self.inProduction });
+    fn getProduction(self: *App) !void {
+        const test_var: ?[]const u8 = std.posix.getenv("INVENTORUS_TEST");
+
+        if (test_var) |_| {
+            self.inProduction = false;
+            std.debug.print("Test mode enabled\n", .{});
+        } else {
+            self.inProduction = true;
+            std.debug.print("Production mode enabled\n", .{});
+        }
+    }
+
+    fn getDbPath(self: *App) !void {
+        _ = std.fs.cwd().statFile(self.dbPath) catch |err| switch (err) {
+            error.FileNotFound => {
+                std.debug.print("Path '{s}' does not exist.\n", .{self.dbPath});
+                self.dbFileCreate = true;
+                return;
+            },
+            else => {
+                std.debug.print("Error checking db path\n", .{});
+                return err;
+            },
+        };
     }
 };
 
@@ -41,7 +61,7 @@ pub const Ans = struct {
     body: []const u8,
 };
 
-pub const Component = struct {
+pub const Components = struct {
     id: u32,
     type_id: u32,
     value: []const u8,
@@ -50,17 +70,17 @@ pub const Component = struct {
     vendor_id: u32,
     description: []const u8,
     vendor_part_number: []const u8,
-    price: u32,
+    price: []const u8, // gonna have to figure out how to handle this as a float
 };
 
-pub const Vendor = struct {
+pub const Vendors = struct {
     id: u32,
     url: []const u8,
     description: []const u8,
     name: []const u8,
 };
 
-pub const Type = struct {
+pub const Types = struct {
     id: u32,
     name: []const u8,
     description: []const u8,
