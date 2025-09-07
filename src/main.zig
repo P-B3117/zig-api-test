@@ -6,7 +6,7 @@ const tk = @import("tokamak");
 
 const routes: []const tk.Route = &.{
     // tk.logger(.{}),
-    .get("/test", tk.send("Hello")), // Classic Express-style routing
+    // .get("/test", tk.send("Hello")), // Classic Express-style routing
     .group("/", &.{.router(api.Api)}), // Structured routing with a module
     .send(error.NotFound),
 };

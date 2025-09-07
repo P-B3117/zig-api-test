@@ -10,12 +10,12 @@ const testSql = @embedFile("./sql/test_values.sql");
 pub const App = struct {
     port: u16,
     dbPool: fr.Pool(fr.SQLite3),
-    inProduction: bool = false,
+    inProd: bool = false,
     dbFileCreate: bool = false,
     dbPath: [:0]const u8 = "inventorusDb.sqlite",
 
     pub fn initDb(self: *App, allocator: std.mem.Allocator) !void {
-        try self.getProduction();
+        try self.getProdState(allocator);
         try self.getDbPath();
         self.dbPool = try fr.Pool(fr.SQLite3).init(allocator, .{ .max_count = 5 }, .{ .filename = self.dbPath });
 
@@ -23,21 +23,24 @@ pub const App = struct {
         defer db.deinit();
 
         try db.conn.execAll(initSql);
-        if (!self.inProduction and self.dbFileCreate) {
+        if (!self.inProd and self.dbFileCreate) {
             try db.conn.execAll(testSql);
         }
     }
 
-    fn getProduction(self: *App) !void {
-        const test_var: ?[]const u8 = std.posix.getenv("INVENTORUS_TEST");
+    fn getProdState(self: *App, allocator: std.mem.Allocator) !void {
+        const test_var = std.process.getEnvVarOwned(allocator, "INVENTORUS_TEST") catch |err| switch (err) {
+            error.EnvironmentVariableNotFound => {
+                self.inProd = true;
+                std.debug.print("Production mode enabled\n", .{});
+                return;
+            },
+            else => return err,
+        };
+        defer allocator.free(test_var);
 
-        if (test_var) |_| {
-            self.inProduction = false;
-            std.debug.print("Test mode enabled\n", .{});
-        } else {
-            self.inProduction = true;
-            std.debug.print("Production mode enabled\n", .{});
-        }
+        self.inProd = false;
+        std.debug.print("Test mode enabled\n", .{});
     }
 
     fn getDbPath(self: *App) !void {
@@ -55,11 +58,24 @@ pub const App = struct {
     }
 };
 
-pub const Ans = struct {
-    id: u32,
-    title: []const u8,
-    body: []const u8,
-};
+// function used to exclude the id field from a struct to make them insertable from the db
+fn ExcludeId(comptime T: type) type {
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = blk: {
+                var fields: []const std.builtin.Type.StructField = &.{};
+                for (@typeInfo(T).@"struct".fields) |f| {
+                    if (std.mem.eql(u8, f.name, "id")) continue;
+                    fields = fields ++ [_]std.builtin.Type.StructField{f};
+                }
+                break :blk fields;
+            },
+            .decls = &.{},
+            .is_tuple = false,
+        },
+    });
+}
 
 pub const Components = struct {
     id: u32,
@@ -70,8 +86,10 @@ pub const Components = struct {
     vendor_id: u32,
     description: []const u8,
     vendor_part_number: []const u8,
-    price: []const u8, // gonna have to figure out how to handle this as a float
+    price: u16, // gonna have to figure out how to handle this as a float without trailing zeroes and imprecision
 };
+
+pub const ComponentsInsert = ExcludeId(Components);
 
 pub const Vendors = struct {
     id: u32,
@@ -80,8 +98,13 @@ pub const Vendors = struct {
     name: []const u8,
 };
 
+pub const VendorsInsert = ExcludeId(Vendors);
+
 pub const Types = struct {
     id: u32,
     name: []const u8,
     description: []const u8,
+    unit: []const u8,
 };
+
+pub const TypesInsert = ExcludeId(Types);
