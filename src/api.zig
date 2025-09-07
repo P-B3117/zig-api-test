@@ -6,6 +6,14 @@ const res = @import("./ressource.zig");
 
 const index = @embedFile("./html/index.html");
 
+// CORS headers helper function
+fn addCorsHeaders(response: *tk.Response) void {
+    response.header("Access-Control-Allow-Origin", "*");
+    response.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    response.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    response.header("Access-Control-Max-Age", "86400");
+}
+
 const compErr = res.Components{
     .id = 0,
     .type_id = 0,
@@ -36,6 +44,7 @@ const typErr = res.Types{
 // allocator frees everything after the requests ends. Somehow that doesn't work for the db.
 pub const Api = struct {
     pub fn @"GET /"(response: *tk.Response) !void {
+        addCorsHeaders(response);
         response.header("Content-Type", "text/html");
         response.body = index;
         try response.write();
